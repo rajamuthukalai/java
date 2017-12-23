@@ -4,6 +4,7 @@ import java.util.Hashtable;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
+import javax.jms.MessageListener;
 import javax.jms.Queue;
 import javax.jms.QueueConnection;
 import javax.jms.QueueConnectionFactory;
@@ -15,7 +16,7 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
-public class QueueReceive {
+public class QueueReceive implements MessageListener {
 
 	// Defines the JNDI context factory.
 	public final static String JNDI_FACTORY = "weblogic.jndi.WLInitialContextFactory";
@@ -31,7 +32,6 @@ public class QueueReceive {
 	private QueueSession qsession;
 	private QueueReceiver qreceiver;
 	private Queue queue;
-	private Message message;
 
 	public void init(Context ctx, String queueName) throws NamingException, JMSException {
 		qconFactory = (QueueConnectionFactory) ctx.lookup(JMS_FACTORY);
@@ -39,14 +39,8 @@ public class QueueReceive {
 		qsession = qcon.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
 		queue = (Queue) ctx.lookup(queueName);
 		qreceiver = qsession.createReceiver(queue);
+		qreceiver.setMessageListener(this);
 		qcon.start();
-	}
-
-	public void receiveMesssage() throws JMSException {
-		message = qreceiver.receive();
-		if (message != null && message instanceof TextMessage) {
-			System.out.println(((TextMessage) message).getText());
-		}
 	}
 
 	public void close() throws JMSException {
@@ -59,8 +53,7 @@ public class QueueReceive {
 		InitialContext ic = getInitialContext();
 		QueueReceive qs = new QueueReceive();
 		qs.init(ic, QUEUE);
-		qs.receiveMesssage();
-		qs.close();
+		//qs.close();
 	}
 
 	private static InitialContext getInitialContext() throws NamingException {
@@ -68,5 +61,20 @@ public class QueueReceive {
 		env.put(Context.INITIAL_CONTEXT_FACTORY, JNDI_FACTORY);
 		env.put(Context.PROVIDER_URL, "t3://localhost:7001");
 		return new InitialContext(env);
+	}
+
+	@Override
+	public void onMessage(Message message) {
+		if (message != null) {
+			try {
+				if (message instanceof TextMessage) {
+					System.out.println(((TextMessage) message).getText());
+				} else {
+					System.out.println(message.toString());
+				}
+			} catch (JMSException e) {
+				System.err.println("An error occurred:" + e.getMessage());
+			}
+		}
 	}
 }
